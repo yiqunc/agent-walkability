@@ -17,6 +17,7 @@ import org.geotools.data.Query;
 import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
+import org.geotools.factory.CommonFactoryFinder;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
 import org.mccaughey.geotools.util.ShapeFile;
@@ -24,6 +25,8 @@ import org.mccaughey.pathGenerator.config.LayerMapping;
 import org.mccaughey.service.impl.WFSDataStoreFactoryImpl;
 import org.mccaughey.util.TemporaryFileManager;
 import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.filter.Filter;
+import org.opengis.filter.FilterFactory2;
 import org.opengis.geometry.MismatchedDimensionException;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
@@ -79,21 +82,15 @@ public class AgentModelResource {
 				.getWebApplicationContext(request.getSession()
 						.getServletContext());
 
-		DataStore dataStore = wfsDataStoreFactoryImpl
-				.getDataStore(LayerMapping.randomDestinationLayer);
-		SimpleFeatureSource networkSource = dataStore
-				.getFeatureSource(LayerMapping.roadSampleLayer);
+		DataStore dataStore = wfsDataStoreFactoryImpl.getDataStore(LayerMapping.randomDestinationLayer);
+		SimpleFeatureSource networkSource = dataStore.getFeatureSource(LayerMapping.roadSampleLayer);
+		
 		Query query = new DefaultQuery(LayerMapping.randomDestinationLayer);
 		query.setCoordinateSystem(CRS.decode("EPSG:28355"));
+		
 		SimpleFeatureIterator features = dataStore
 				.getFeatureSource(LayerMapping.randomDestinationLayer)
 				.getFeatures(query).features();
-		//
-		List<Point> destinations = new ArrayList<Point>();
-		while (features.hasNext()) {
-			SimpleFeature feature = features.next();
-			destinations.add((Point) feature.getDefaultGeometry());
-		}
 
 		GeometryFactory geometryFactory = new GeometryFactory(
 				new PrecisionModel(0));
@@ -107,6 +104,16 @@ public class AgentModelResource {
 		MathTransform transform = CRS.findMathTransform(sourceCRS, targetCRS);
 		Point targetGeometry = (Point) JTS.transform(start, transform);
 
+		// filter out destinations which are too far
+		List<Point> destinations = new ArrayList<Point>();
+		while (features.hasNext()) {
+			SimpleFeature feature = features.next();
+			Point dest = (Point) feature.getDefaultGeometry();
+			if (dest.distance(targetGeometry) <= maxDistance){
+				destinations.add(dest);
+			}
+		}
+		
 		LOGGER.info("Converted geom: " + targetGeometry.toString());
 
 		LOGGER.info("sessionid:" + request.getSession().getId());
@@ -158,6 +165,7 @@ public class AgentModelResource {
 				FileCopyUtils.copy(new FileInputStream(file),
 						response.getOutputStream());
 			} catch (GeneratedOutputEmptyException e) {
+				LOGGER.error(e.getMessage());
 				LOGGER.error("Empty Output!!");
 				TemporaryFileManager.deleteAll(request.getSession());
 			}

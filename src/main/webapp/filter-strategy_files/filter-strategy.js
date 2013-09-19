@@ -181,7 +181,7 @@ var mercator = new OpenLayers.Projection("EPSG:900913");
 var geographic = new OpenLayers.Projection("EPSG:4326");
 var vicgrid = new OpenLayers.Projection("EPSG:28355");
 var controls = [ new OpenLayers.Control.LayerSwitcher(),
-		new OpenLayers.Control.Zoom() ];
+		new OpenLayers.Control.PanZoomBar() ];
 map = new OpenLayers.Map("map", {
 	controls : controls
 });
@@ -346,6 +346,8 @@ function setControls() {
 		displayClass : 'customEditingToolbar',
 		allowDepress : true
 	});
+	
+	
 	var draw = new OpenLayers.Control.DrawFeature(wfs, OpenLayers.Handler.Path,
 			{
 				title : "Draw Feature",
@@ -371,8 +373,8 @@ function setControls() {
 		},
 		displayClass : "olControlSaveFeatures"
 	});
-
-	panel.addControls([ save, del, modify, draw ]);
+	
+	panel.addControls([save, del, modify, draw ]);
 
 	map.addControl(panel);
 }

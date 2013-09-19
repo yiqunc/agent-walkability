@@ -52,8 +52,7 @@ public final class PathGenerator {
 	private static final double GEOMETRY_PRECISION = 100;
 	static final Logger LOGGER = LoggerFactory.getLogger(PathGenerator.class);
 	private static final Double MAX_SNAP_DISTANCE = 300.0;
-	private static PrecisionModel precision = new PrecisionModel(
-			GEOMETRY_PRECISION);
+	private static PrecisionModel precision = new PrecisionModel(GEOMETRY_PRECISION);
 
 	private PathGenerator() {
 	}
@@ -65,29 +64,25 @@ public final class PathGenerator {
 		FilterFactory2 ff = CommonFactoryFinder.getFilterFactory2();
 		String geometryPropertyName = networkSource.getSchema()
 				.getGeometryDescriptor().getLocalName();
-		// Filter filter = ff.intersects(ff.property(geometryPropertyName),
-		// (start.buffer(maxDistance)));
+
 		Filter filter = ff.dwithin(ff.property(geometryPropertyName), ff
 				.literal(start), maxDistance, networkSource.getSchema().getCoordinateReferenceSystem()
 				.toString());
 
-		// Query query = new Query(LayerMapping.roadSampleLayer);
 
-		// query.setCoordinateSystem(CRS.decode("EPSG:28355"));
-		// query.setFilter(filter);
-		SimpleFeatureCollection networkSimpleFeatureCollection = networkSource
-				.getFeatures(filter);
-		LOGGER.info("FEATURES: {}", networkSimpleFeatureCollection.size());
+		SimpleFeatureCollection networkSimpleFeatureCollection = networkSource.getFeatures(filter);
+		
+		LOGGER.info("network FEATURES: {}", networkSimpleFeatureCollection.size());
+		LOGGER.info("Destination FEATURES: {}", destinations.size());
+		
 		List<LineString> lines = nodeIntersections(networkSimpleFeatureCollection);
 
-		//
-
 		// Build a graph with all the destinations connected
+		LOGGER.info("createGraphWithAdditionalNodes starts");
 		LineStringGraphGenerator lineStringGen = createGraphWithAdditionalNodes(
 				lines, start, destinations);
 		Graph graph = lineStringGen.getGraph();
 
-		// LOGGER.info("GRAPH: " + graph);
 		LOGGER.info("Point: {}", start.toText());
 		Node startNode = lineStringGen.getNode(start.getCoordinate());
 		LOGGER.info("Start Node {}", startNode.toString());
@@ -156,6 +151,8 @@ public final class PathGenerator {
 
 		if (startConnectedLine != null) {
 			addConnectingLine(startingPoint, lines, startConnectedLine);
+		} else {
+			LOGGER.info("== cannt find line for start point");
 		}
 
 		for (Point endPoint : destinations) {
@@ -163,8 +160,11 @@ public final class PathGenerator {
 					sourceLines, MAX_SNAP_DISTANCE, endPoint);
 			if (endConnectedLine != null) {
 				addConnectingLine(endPoint, lines, endConnectedLine);
+			} else {
+				LOGGER.info("== cannt find line for end point");
 			}
 		}
+		
 		nodeIntersections(lines);
 
 		// create a linear graph generator
@@ -172,12 +172,61 @@ public final class PathGenerator {
 		for (LineString line : lines) {
 			lineStringGen.add(line);
 		}
-
+		LOGGER.info("== before return createGraphWithAdditionalNodes");
 		return lineStringGen;
 
 	}
-
+	
 	private static List<LineString> addConnectingLine(Point newPoint,
+			List<LineString> lines, LocationIndexedLine connectedLine) {
+		Coordinate pt = newPoint.getCoordinate();
+		LinearLocation here = connectedLine.project(pt);
+		Coordinate minDistPoint = connectedLine.extractPoint(here);
+		LineString lineA = (LineString) connectedLine.extractLine(connectedLine.getStartIndex(), here);
+		LineString lineB = (LineString) connectedLine.extractLine(here, connectedLine.getEndIndex());
+		LineString originalLine = (LineString) connectedLine.extractLine(connectedLine.getStartIndex(), connectedLine.getEndIndex());
+
+		GeometryFactory geometryFactory = new GeometryFactory(precision);
+		LineString newConnectingLine = geometryFactory.createLineString(new Coordinate[] { pt, minDistPoint });
+
+		lines.add(newConnectingLine);
+		
+		removeLine(lines, originalLine);
+		if(lineA!=null && lineA.getLength()>0){lines.add(lineA);}
+		if(lineB!=null && lineB.getLength()>0){lines.add(lineB);}
+		
+		return lines;
+	}
+	
+	private static List<LineString> addConnectingLine_old2(Point newPoint,
+			List<LineString> lines, LocationIndexedLine connectedLine) {
+		Coordinate pt = newPoint.getCoordinate();
+		LinearLocation here = connectedLine.project(pt);
+		Coordinate minDistPoint = connectedLine.extractPoint(here);
+		LineString lineA = (LineString) connectedLine.extractLine(
+				connectedLine.getStartIndex(),
+				connectedLine.project(minDistPoint));
+		LineString lineB = (LineString) connectedLine.extractLine(
+				connectedLine.project(minDistPoint),
+				connectedLine.getEndIndex());
+		LineString originalLine = (LineString) connectedLine.extractLine(
+				connectedLine.getStartIndex(), connectedLine.getEndIndex());
+
+		GeometryFactory geometryFactory = new GeometryFactory(precision);
+		LineString newConnectingLine = geometryFactory
+				.createLineString(new Coordinate[] { pt, minDistPoint });
+
+		lines.add(newConnectingLine);
+		
+		removeLine(lines, originalLine);
+		if(lineA.getLength()>0){lines.add(lineA);}
+		if(lineB.getLength()>0){lines.add(lineB);}
+		
+		return lines;
+	}
+
+	
+	private static List<LineString> addConnectingLine_old(Point newPoint,
 			List<LineString> lines, LocationIndexedLine connectedLine) {
 		Coordinate pt = newPoint.getCoordinate();
 		LinearLocation here = connectedLine.project(pt);
@@ -281,7 +330,7 @@ public final class PathGenerator {
 	private static List<LineString> nodeIntersections(
 			SimpleFeatureCollection nonNodedNetwork) {
 		SimpleFeatureIterator networkIterator = nonNodedNetwork.features();
-
+		LOGGER.info("==size of nonNodedNetwork:{}",nonNodedNetwork.size());
 		List<LineString> lines = new ArrayList<LineString>();
 
 		while (networkIterator.hasNext()) {
@@ -291,7 +340,7 @@ public final class PathGenerator {
 				lines.add((LineString) line.getGeometryN(i));
 			}
 		}
-
+		LOGGER.info("==size of parsed lines:{}",lines.size());
 		return nodeIntersections(lines);
 
 	}
@@ -315,9 +364,9 @@ public final class PathGenerator {
 			if (!(mlsPt.isValid())) {
 				LOGGER.info("Point not valid?");
 			}
-			List<LineString> unUnioned = rawLines;
-			int loopCount = 0;
-			int giveUp = 10 * rawLines.size();
+			//List<LineString> unUnioned = rawLines;
+			//int loopCount = 0;
+			//int giveUp = 10 * rawLines.size();
 			// Geometry nodedLines = null;
 			// while ((unUnioned.size() > 0) && (loopCount < giveUp)) {
 			// // for (int i = 0; i < unUnioned.size(); i++) {
@@ -336,8 +385,9 @@ public final class PathGenerator {
 			// // }
 			// }
 			// nodedLines = nodedLines.union(mlsPt);
+			LOGGER.info("=== p1");
 			Geometry nodedLines = grandMls.union(mlsPt);
-
+			LOGGER.info("=== p2");
 			lines.clear();
 
 			for (int i = 0, n = nodedLines.getNumGeometries(); i < n; i++) {
