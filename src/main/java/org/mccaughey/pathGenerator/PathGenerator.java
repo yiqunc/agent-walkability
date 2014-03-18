@@ -48,7 +48,7 @@ import com.vividsolutions.jts.linearref.LocationIndexedLine;
 public final class PathGenerator {
 
 	// LINE_DENSITY -> how many units (metres hopefully) between each point
-	private static final double LINE_DENSITY = 0.01;
+	private static final double LINE_DENSITY = 1; //default value is 0.01, which slows down the processing speed
 	private static final double GEOMETRY_PRECISION = 100;
 	static final Logger LOGGER = LoggerFactory.getLogger(PathGenerator.class);
 	private static final Double MAX_SNAP_DISTANCE = 300.0;

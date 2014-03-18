@@ -208,7 +208,7 @@ OpenLayers.Control.Click = OpenLayers.Class(OpenLayers.Control, {
 	},
 
 	trigger : function(e) {
-		map.g
+		//map.g
 		var lonlat = (map.getLonLatFromPixel(e.xy));
 		easting = lonlat.lon;
 		northing = lonlat.lat;
@@ -299,7 +299,7 @@ function initWFSTools() {
 	});
 
 	wfs = new OpenLayers.Layer.Vector(
-			"Editable Roads",
+			"Roads",
 			{
 				strategies : [ new OpenLayers.Strategy.BBOX(), saveStrategy ],
 				projection : mercator,
@@ -376,7 +376,8 @@ function setControls() {
 	
 	panel.addControls([save, del, modify, draw ]);
 
-	map.addControl(panel);
+	//comment this line to disable edit network
+	//map.addControl(panel);
 }
 
 function flashFeatures(features, index) {
